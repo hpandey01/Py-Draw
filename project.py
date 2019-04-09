@@ -1,6 +1,10 @@
 from tkinter import *
 import PIL.Image
 from PIL import ImageTk
+import numpy as np
+from scipy import optimize
+from scipy import stats
+from sklearn import cluster
 
 # calling all Tk objects
 root=Tk()
@@ -17,6 +21,10 @@ polyy=0
 
 prev="null"        # tells which shape was active earlier
 
+penid=[]           # for smoothing the curves
+xlist=[]
+ylist=[]
+
 # instance of frame object
 frame= Frame(root,height="540", width="980")
 frame.pack()
@@ -29,9 +37,6 @@ canvas.place(relheight=1.0, relwidth=.86, relx=.14, rely=0)
 class button:
     def __init__(self,shape, relx, rely):
         self.atv=0                         # tells us if this shape is currently active
-        self.command=shape                 # command which activates the shape to be drawn
-        self.relx=relx                     # position of the button
-        self.rely=rely
 
         # dictates the images on the buttons
         var=shape+".png"                    
@@ -39,9 +44,9 @@ class button:
         self.photo=ImageTk.PhotoImage(self.image)
 
         # calling the button object of tkinter
-        self.button=Button(root, image=self.photo, command=lambda: draw(self.command))
-        self.button.image=self.image
-        self.button.place(relx=self.relx, rely=self.rely, relheight=0.07, relwidth=0.07)
+        self.button=Button(root, image=self.photo, command=lambda: draw(self))
+        self.button.image=self.image           # keeping an instance of the image to avoid python grabage collector
+        self.button.place(relx=relx, rely=rely, relheight=0.07, relwidth=0.07)
 
 # cleans the entire canvas
 def clean():
@@ -54,88 +59,15 @@ def draw(a):
     # changing the active status of previosly selected button
     # and raising the previosly selected button
     if prev!="null":
-        if prev=="line":
-            line.atv=0
-            line.button.config(relief='raised')
-        elif prev=="oval":
-            oval.atv=0
-            oval.button.config(relief='raised')
-        elif prev=="rect":
-            rect.atv=0
-            rect.button.config(relief='raised')
-        elif prev=="pen":
-            pen.atv=0
-            pen.button.config(relief='raised')
-        elif prev=="erase":
-            erase.atv=0
-            erase.button.config(relief='raised')
-            canvas.config(cursor="arrow")
-        elif prev=="broom":
-            broom.atv=0
-        elif prev=="rho":
-            rho.atv=0
-            rho.button.config(relief='raised')
-        elif prev=="right":
-            right.atv=0
-            right.button.config(relief='raised')
-        elif prev=="tri":
-            tri.atv=0
-            tri.button.config(relief='raised')
-        elif prev=="pent":
-            pent.atv=0
-            pent.button.config(relief='raised')
-        elif prev=="hex":
-            hex.atv=0
-            hex.button.config(relief='raised')
-        elif prev=="star":
-            star.atv=0
-            star.button.config(relief='raised')
-        elif prev=="poly":
-            poly.atv=0
-            polyvar=0
-            poly.button.config(relief='raised')
+        prev.atv=0
+        prev.button.config(relief='raised')
 
-    # changing the active status according to button click
-    # and making the selected button pressed as long as it is in use
-    if a=="line":
-        line.atv=1
-        line.button.config(relief='sunken')
-    elif a=="oval":
-        oval.atv=1
-        oval.button.config(relief='sunken')
-    elif a=="rect":
-        rect.atv=1
-        rect.button.config(relief='sunken')
-    elif a=="pen":
-        pen.atv=1
-        pen.button.config(relief='sunken')
-    elif a=="broom":
-        broom.atv=1
-    elif a=="erase":
-        erase.atv=1
-        erase.button.config(relief='sunken')
-        canvas.config(cursor="circle")
-    elif a=="rho":
-        rho.atv=1
-        rho.button.config(relief='sunken')
-    elif a=="right":
-        right.atv=1
-        right.button.config(relief='sunken')
-    elif a=="tri":
-        tri.atv=1
-        tri.button.config(relief='sunken')
-    elif a=="pent":
-        pent.atv=1
-        pent.button.config(relief='sunken')
-    elif a=="hex":
-        hex.atv=1
-        hex.button.config(relief='sunken')
-    elif a=="star":
-        star.atv=1
-        star.button.config(relief='sunken')
-    elif a=="poly":
-        poly.atv=1
-        poly.button.config(relief='sunken')
+    # activating the selected button
+    a.atv=1
+    a.button.config(relief='sunken')
+
+    if prev==poly:             # to stop making a polynomial
+        polyvar=0
 
     # changing the previous button to the current button
     prev=a
@@ -143,55 +75,25 @@ def draw(a):
 
 # storing the coordinates of first click
 def func1(event):
-    global x1,y1,id1,id2,id3,id4,polyvar,initx,inity,polyx,polyy
+    global x1,y1,id1,id2,polyvar,initx,inity,polyx,polyy
 
     # storing the coordinates of first click
     x1=event.x
     y1=event.y
 
     # creating ids of the shape to be drawn
-    if line.atv==1:
-        id1=canvas.create_line(x1,y1,x1,y1)
+    if line.atv==1 or curve.atv==1:
+        xlist.append(x1)
+        ylist.append(y1)
 
-    if oval.atv==1:
-        id1=canvas.create_oval(x1,y1,x1,y1)
-
-    if rect.atv==1:
-        id1=canvas.create_rectangle(x1,y1,x1,y1)
-
-    if pen.atv==1:
-        id1=canvas.create_line(x1,y1,x1,y1)
-
-    if erase.atv==1:
+    elif erase.atv==1:
         id1=canvas.create_line(x1,y1,x1,y1,width=15,fill="white")
 
-    if rho.atv==1:
-        id1=canvas.create_line(x1,y1,x1,y1)
-        id2=canvas.create_line(x1,y1,x1,y1)
-        id3=canvas.create_line(x1,y1,x1,y1)
-        id4=canvas.create_line(x1,y1,x1,y1)
-
-    if right.atv==1:
-        id1=canvas.create_line(x1,y1,x1,y1)
-        id2=canvas.create_line(x1,y1,x1,y1)
-        id3=canvas.create_line(x1,y1,x1,y1)
-
-    if tri.atv==1:
-        id1=canvas.create_line(x1,y1,x1,y1)
-        id2=canvas.create_line(x1,y1,x1,y1)
-        id3=canvas.create_line(x1,y1,x1,y1)
-
-    if pent.atv==1:
-    	id1=canvas.create_line(x1,y1,x1,y1,x1,y1,x1,y1,x1,y1,x1,y1)
-
-    if hex.atv==1:
-    	id1=canvas.create_line(x1,y1,x1,y1,x1,y1,x1,y1,x1,y1,x1,y1,x1,y1)
-
-    if star.atv==1:
+    elif star.atv==1:
     	id1=canvas.create_line(x1,y1,x1,y1,x1,y1)
     	id2=canvas.create_line(x1,y1,x1,y1,x1,y1)
 
-    if poly.atv==1:
+    elif poly.atv==1:
     	if polyvar==0:
     		polyvar=1
     		polyx=x1
@@ -206,99 +108,81 @@ def func1(event):
     		polyx=x1
     		polyy=y1
 
+    else:
+        id1=canvas.create_line(x1,y1,x1,y1)               # creating a dummy id that is used to draw shapes in func2
+
     return
 
 # storing the coordinates of drag and drawing
 def func2(event):
-    global id1,id2,id3,id4,x1,y1
-
+    global id1,id2,x1,y1,penid
+    rect1=[]
     # storing the coordinates of drag
     x2=event.x
     y2=event.y
 
     # deleting the old shape and drawing new one as the user drags the mouse
     if line.atv==1:
-        canvas.coords(id1,x1,y1,x2,y2)
+        id1=canvas.create_line(x1,y1,x2,y2)
+        penid.append(id1)
+        xlist.append(x2)
+        ylist.append(y2)
+        x1=x2
+        y1=y2
 
-    if oval.atv==1:
+    elif oval.atv==1:
         canvas.delete(id1)
         id1=canvas.create_oval(x1,y1,x2,y2)
 
-    if rect.atv==1:
-        canvas.delete(id1)
-        id1=canvas.create_rectangle(x1,y1,x2,y2)
+    elif rect.atv==1 or tri.atv==1:
+        id1=canvas.create_line(x1,y1,x2,y2)
+        penid.append(id1)
+        xlist.append(x2)
+        ylist.append(y2)
+        x1=x2
+        y1=y2
 
-    if pen.atv==1:
+    elif pen.atv==1:
         id1=canvas.create_line(x1,y1,x2,y2)
         x1=x2
         y1=y2
 
-    if erase.atv==1:
+    elif curve.atv==1:
+        id1=canvas.create_line(x1,y1,x2,y2)
+        penid.append(id1)
+        xlist.append(x2)
+        ylist.append(y2)
+        x1=x2
+        y1=y2
+
+    elif erase.atv==1:
         id1=canvas.create_line(x1,y1,x2,y2,width=15,fill="white")
         x1=x2
         y1=y2
 
-    if rho.atv==1:
+    elif rho.atv==1:
         canvas.delete(id1)
-        id1=canvas.create_line((x1+x2)/2,y1,x2,(y1+y2)/2)
-        canvas.delete(id2)
-        id2=canvas.create_line(x2,(y1+y2)/2,(x1+x2)/2,y2)
-        canvas.delete(id3)
-        id3=canvas.create_line((x1+x2)/2,y2,x1,(y1+y2)/2)
-        canvas.delete(id4)
-        id4=canvas.create_line(x1,(y1+y2)/2,(x1+x2)/2,y1)
+        id1=canvas.create_line((x1+x2)/2,y1,x2,(y1+y2)/2,(x1+x2)/2,y2,x1,(y1+y2)/2,(x1+x2)/2,y1)
 
-    if right.atv==1:
+    elif right.atv==1:
         canvas.delete(id1)
-        id1=canvas.create_line(x1,y1,x2,y2)
-        canvas.delete(id2)
-        id2=canvas.create_line(x1,y1,x1,y2)
-        canvas.delete(id3)
-        id3=canvas.create_line(x1,y2,x2,y2)
+        id1=canvas.create_line(x1,y1,x2,y2,x1,y2,x1,y1)
 
-    if tri.atv==1:
-        canvas.delete(id1)
-        id1=canvas.create_line((x1+x2)/2,y1,x2,y2)
-        canvas.delete(id2)
-        id2=canvas.create_line((x1+x2)/2,y1,x1,y2)
-        canvas.delete(id3)
-        id3=canvas.create_line(x1,y2,x2,y2)
+    # elif tri.atv==1:
+    #     canvas.delete(id1)
+    #     id1=canvas.create_line((x1+x2)/2,y1,x2,y2,x1,y2,(x1+x2)/2,y1)
 
-    if pent.atv==1:
+    elif pent.atv==1:
     	canvas.delete(id1)
 
-    	a1=(x1+x2)/2
-    	b1=y1
-    	a2=x1
-    	b2=(y1+y2)/2-0.3249*(y2-y1)/2
-    	a3=0.5*(x1-x2)/1.37638+(x1+x2)/2
-    	b3=y2
-    	a4=0.5*(x2-x1)/1.37638+(x1+x2)/2
-    	b4=y2
-    	a5=x2
-    	b5=b2
+    	id1=canvas.create_line((x1+x2)/2,y1,x1,(y1+y2)/2-0.3249*(y2-y1)/2,0.5*(x1-x2)/1.37638+(x1+x2)/2,y2,0.5*(x2-x1)/1.37638+(x1+x2)/2,y2,x2,(y1+y2)/2-0.3249*(y2-y1)/2,(x1+x2)/2,y1)
 
-    	id1=canvas.create_line(a1,b1,a2,b2,a3,b3,a4,b4,a5,b5,a1,b1)
-
-    if hex.atv==1:
+    elif hex.atv==1:
     	canvas.delete(id1)
 
-    	a1=(x1+x2)/2
-    	b1=y1
-    	a2=x1
-    	b2=y1+(y2-y1)*0.2929
-    	a3=x1
-    	b3=y2-(y2-y1)*0.2929
-    	a4=a1
-    	b4=y2
-    	a5=x2
-    	b5=b3
-    	a6=x2
-    	b6=b2
+    	id1=canvas.create_line((x1+x2)/2,y1,x1,y1+(y2-y1)*0.2929,x1,y2-(y2-y1)*0.2929,(x1+x2)/2,y2,x2,y2-(y2-y1)*0.2929,x2,y1+(y2-y1)*0.2929,(x1+x2)/2,y1)
 
-    	id1=canvas.create_line(a1,b1,a2,b2,a3,b3,a4,b4,a5,b5,a6,b6,a1,b1)
-
-    if star.atv==1:
+    elif star.atv==1:
     	canvas.delete(id1)
     	canvas.delete(id2)
 
@@ -310,9 +194,120 @@ def func2(event):
 
     return
 
+def shape(x,n):
+
+    x2=[]
+    for i in range(0,n):
+        x2+=[[]]
+
+    split=[]
+    kmeans=cluster.KMeans(n).fit(x)
+    arr=kmeans.labels_
+    x1=kmeans.cluster_centers_
+
+    order=[]
+    true=False
+    for i in arr:
+        for j in order:
+            if i==j:
+                true=True
+        if true==True:
+            true=False
+        else:
+            order+=[i]
+
+    cut=0
+    pre=kmeans.predict([x[0]])
+    prev=arr[1]
+    for i in range(1,len(arr)):
+        if arr[i]!=prev:
+            cut=i
+            break
+        prev=arr[i]
+    beg=[]
+    for i in range(0,len(arr)):
+        if arr[i]==pre[0]:
+            if i<=cut:
+                x2[arr[i]]+=[x[i]]
+            else:
+                beg+=[x[i]]
+        else:
+            x2[arr[i]]+=[x[i]]
+    x2[pre[0]]=beg+x2[pre[0]]
+    
+    cen=[]
+    for i in order:
+        cen+=[[x2[i][len(x2[i])//2][0],x2[i][len(x2[i])//2][1]]]
+
+    return(cen)
+
+def func3(event):
+
+    global penid, xlist, ylist, rect1
+
+    for i in range(0,len(penid)):                     # deleting the curves with error
+        canvas.delete(penid[i])
+
+    penid.clear()
+    xarr = np.asarray(xlist)
+    yarr = np.asarray(ylist)
+
+    if line.atv==1:                      # linear regression to correct the drawn line
+
+        opt1 = stats.linregress(xarr, yarr)
+        opt2 = stats.linregress(yarr, xarr)
+
+        if opt1[4]<opt2[4]:
+            yarr=opt1[0]*xarr+opt1[1]
+
+        else:
+            xarr=opt2[0]*yarr+opt2[1]
+
+        for i in range(1,len(xarr)):       # creating the curves with fitted data
+            canvas.create_line(xarr[i-1],yarr[i-1],xarr[i],yarr[i])
+        
+
+    if curve.atv == 1:                 # polynomial regression to smooth the curve
+
+        def func(x, a, b, c, d,e,f):
+            return a*x**5+b*x**4+c*x**3+d*x**2+e*x+f
+
+        popt, pcov= optimize.curve_fit(func, xarr, yarr)
+        print(len(xarr))
+        
+        yarr=func(xarr,popt[0],popt[1],popt[2],popt[3],popt[4],popt[5])
+
+    
+        for i in range(1,len(xarr)):       # creating the curves with fitted data
+            canvas.create_line(xarr[i-1],yarr[i-1],xarr[i],yarr[i])
+
+    x=[]
+    for i in range(0,len(xlist)):
+        x+=[[xlist[i],ylist[i]]]
+    
+    if rect.atv==1:
+        cen=shape(x,4)
+        for i in range(1,4):
+            canvas.create_line(cen[i-1][0],cen[i-1][1],cen[i][0],cen[i][1],fill="black")
+
+        canvas.create_line(cen[0][0],cen[0][1],cen[-1][0],cen[-1][1],fill="black")
+
+    if tri.atv==1:
+        cen=shape(x,3)
+        for i in range(1,3):
+            canvas.create_line(cen[i-1][0],cen[i-1][1],cen[i][0],cen[i][1],fill="black")
+
+        canvas.create_line(cen[0][0],cen[0][1],cen[-1][0],cen[-1][1],fill="black")
+
+    xlist.clear()
+    ylist.clear()
+
+    return
+
 # binding the mouse clicking and dragging events
 canvas.bind("<ButtonPress-1>", func1)
 canvas.bind("<B1-Motion>", func2)
+canvas.bind("<ButtonRelease-1>", func3)
 
 # objects of button of corresponding shape
 line=button('line',0,0)
@@ -327,6 +322,7 @@ pent=button('pent',0.07,0.28)
 hex=button('hex',0,0.35)
 star=button('star',0.07,0.35)
 poly=button('poly',0,0.42)
+curve=button('curve',0.07,0.42)
 
 # clear canvas button
 imbroom=PIL.Image.open("broom.png")
